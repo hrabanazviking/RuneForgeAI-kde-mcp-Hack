@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# yrsa-desktop — Yrsa's one-word road onto the purplelongship desktop tools.
+# Sets the KDE/Wayland session environment that non-interactive shells lack,
+# then dispatches to the right tool. Installed 2026-11-19.
+set -euo pipefail
+export PATH="$HOME/.local/bin:$PATH"
+export XDG_RUNTIME_DIR=/run/user/1000
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+export WAYLAND_DISPLAY=wayland-0
+export DISPLAY=:0
+export XDG_CURRENT_DESKTOP=KDE
+export XDG_SESSION_TYPE=wayland
+
+cmd="${1:-}"
+if [ $# -gt 0 ]; then shift; fi
+case "$cmd" in
+  cul) exec computer-use-linux "$@" ;;
+  aws) exec agent-workspace-linux "$@" ;;
+  kde) exec python3 "$HOME/apps/yrsa-kde.py" "$@" ;;
+  doctor-all)
+    echo "== computer-use-linux =="
+    computer-use-linux doctor 2>/dev/null | python3 -c "import json,sys; r=json.load(sys.stdin)['readiness']; print('tree:', r['can_build_accessibility_tree'], '| windows:', r['can_query_windows'], '| input:', r['can_send_development_input'], '| blockers:', r['blockers'])"
+    echo "== agent-workspace-linux =="
+    agent-workspace-linux doctor 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('kwin workspace:', d['ready_for_kwin_workspace'], '| host viewer:', d['ready_for_host_viewer'], '| x11 workspace:', d['ready_for_x11_workspace'], '| blockers:', d['blockers'])"
+    echo "== kde-mcp =="
+    python3 "$HOME/apps/yrsa-kde.py" observe | head -c 300; echo
+    ;;
+  *)
+    echo "usage: yrsa-desktop {cul|aws|kde|doctor-all} ..." >&2
+    echo "  cul <args>   computer-use-linux (doctor, windows, apps, state, mcp)" >&2
+    echo "  aws <args>   agent-workspace-linux (doctor, workspace ...)" >&2
+    echo "  kde <tool> [json-args]   one kde-mcp tool call (observe, screenshot, window_query, ...)" >&2
+    exit 2
+    ;;
+esac
